@@ -12,13 +12,13 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/harsha-biradar/Spring_project.git'
             }
         }
-
-        stage('Build Application') {
-            steps {
-                // Build the JAR file using Maven
-                sh './mvnw clean package -DskipTests'
-            }
-        }
+stage('Build Application') {
+    steps {
+        // Force executable permissions on mvnw for the Jenkins workspace
+        sh 'chmod +x mvnw'
+        sh './mvnw clean package -DskipTests'
+    }
+}
 
         stage('Build Docker Image') {
             steps {
