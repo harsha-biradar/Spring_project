@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // Change 'your-dockerhub-username' to your actual Docker Hub username
-        DOCKER_HUB_USER = 'your-dockerhub-username'
+        DOCKER_HUB_USER = 'harshaa2475'
         APP_NAME        = 'spring-boot-app'
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
         IMAGE_NAME      = "${DOCKER_HUB_USER}/${APP_NAME}"
