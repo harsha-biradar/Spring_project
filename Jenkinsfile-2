@@ -1,0 +1,43 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'ACTION',
+            choices: ['Deploy Application', 'Deploy Database', 'Remove Application', 'Remove Database'],
+            description: 'Select the operation to perform on the Kubernetes cluster'
+        )
+    }
+
+    stages {
+        stage('Execute Kubernetes Operations') {
+            steps {
+                script {
+                    switch(params.ACTION) {
+                        case 'Deploy Database':
+                            echo 'Deploying MySQL StatefulSet into production namespace...'
+                            sh 'kubectl apply -f mysql-statefulset.yaml'
+                            sh 'kubectl rollout status statefulset/mysql -n production --timeout=120s'
+                            break
+
+                        case 'Deploy Application':
+                            echo 'Deploying Spring Boot Application into production namespace...'
+                            sh 'kubectl apply -f spring-app.yaml'
+                            sh 'kubectl rollout status deployment/spring-app -n production --timeout=120s'
+                            break
+
+                        case 'Remove Application':
+                            echo 'Removing Spring Boot Application from production namespace...'
+                            sh 'kubectl delete -f spring-app.yaml --ignore-not-found=true'
+                            break
+
+                        case 'Remove Database':
+                            echo 'Removing MySQL StatefulSet from production namespace...'
+                            sh 'kubectl delete -f mysql-statefulset.yaml --ignore-not-found=true'
+                            break
+                    }
+                }
+            }
+        }
+    }
+}
