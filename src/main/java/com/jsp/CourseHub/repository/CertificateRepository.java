@@ -1,0 +1,17 @@
+package com.jsp.CourseHub.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.jsp.CourseHub.entity.Certificate;
+
+public interface CertificateRepository extends JpaRepository<Certificate, Integer> {
+    
+    Optional<Certificate> findByStudentIdAndCourseId(int studentId, int courseId);
+    
+    List<Certificate> findByStudentId(int studentId);
+    
+    Optional<Certificate> findByCertificateNumber(String certificateNumber);
+}

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${course.title} + ' - CourseHub'">Course Details - CourseHub</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <!-- Razorpay Web Checkout JS SDK -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <header class="glass-header">
+        <div class="container nav-wrapper">
+            <a href="/" class="brand-logo">CourseHub</a>
+            <nav class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/swagger-ui/index.html" class="nav-link" target="_blank">APIs Docs</a>
+                
+                <span sec:authorize="isAuthenticated()">
+                    <a sec:authorize="hasRole('STUDENT')" href="/student/dashboard" class="btn btn-secondary">Dashboard</a>
+                    <a sec:authorize="hasAnyRole('TRAINER','ADMIN')" href="/trainer/dashboard" class="btn btn-secondary">Dashboard</a>
+                    <span style="color: var(--text-secondary); margin-right: 12px; font-weight: 500;">
+                        Hello, <span th:text="${user != null ? user.name : 'User'}">Name</span>
+                    </span>
+                    <a href="/logout" class="btn btn-danger btn-sm" style="padding: 6px 12px; font-size: 13px;">Logout</a>
+                </span>
+                
+                <span sec:authorize="isAnonymous()">
+                    <a href="/login" class="nav-link" style="margin-right: 15px;">Login</a>
+                    <a href="/register" class="btn btn-primary">Sign Up</a>
+                </span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="detail-grid">
+            <!-- Left Panel: Course Info & Mock Tests -->
+            <div class="detail-main">
+                <div class="glass-panel" style="padding: 40px;">
+                    <span class="course-category" th:text="${course.category != null ? course.category.categoryName : 'General'}">Category</span>
+                    <h1 style="font-size: 36px; margin-top: 10px; margin-bottom: 20px;" th:text="${course.title}">Course Title</h1>
+                    
+                    <p style="color: var(--text-secondary); line-height: 1.7; font-size: 16px; margin-bottom: 30px;" th:text="${course.discription}">
+                        Detailed description of the course.
+                    </p>
+
+                    <div style="display: flex; gap: 40px; border-top: 1px solid var(--border-color); padding-top: 24px;">
+                        <div>
+                            <span style="display: block; font-size: 12px; color: var(--text-secondary); text-transform: uppercase;">Duration</span>
+                            <span style="font-size: 16px; font-weight: 600;" th:text="${course.duration} + ' Hours'">40 Hours</span>
+                        </div>
+                        <div>
+                            <span style="display: block; font-size: 12px; color: var(--text-secondary); text-transform: uppercase;">Created Date</span>
+                            <span style="font-size: 16px; font-weight: 600;" th:text="${course.createdDate}">2026-06-20</span>
+                        </div>
+                        <div>
+                            <span style="display: block; font-size: 12px; color: var(--text-secondary); text-transform: uppercase;">Trainer</span>
+                            <span style="font-size: 16px; font-weight: 600;" th:text="${course.trainer != null ? course.trainer.name : 'Unknown'}">Trainer Name</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Course Content: Modules & Lessons (only for enrolled students / previewing trainers-admins) -->
+                <div th:if="${isPurchased}">
+                    <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 20px; margin-top: 30px;">Course Content</h2>
+                    <div id="msg-box" class="alert" style="display: none; margin-bottom: 15px;"></div>
+                    <div id="course-modules-container">
+                        <div class="glass-panel" style="padding: 30px; text-align: center; color: var(--text-secondary);">Loading modules...</div>
+                    </div>
+                </div>
+
+                <!-- Mock Tests List -->
+                <div>
+                    <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 20px; margin-top: 30px;">Course Mock Tests</h2>
+                    
+                    <div th:if="${mockTests.isEmpty()}" class="glass-panel" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        No mock tests are added to this course yet.
+                    </div>
+                    
+                    <div class="mock-test-list">
+                        <div th:each="mock : ${mockTests}" class="mock-test-item glass-panel">
+                            <div class="mock-test-info">
+                                <h4 th:text="${mock.title}">Mock Test Title</h4>
+                                <span th:text="${mock.duration} + ' Mins | ' + (${mock.questions != null ? mock.questions.size() : 0}) + ' Questions'">30 Mins | 20 Questions</span>
+                            </div>
+                            
+                            <div>
+                                <!-- If purchased / enrolled / is trainer -->
+                                <a th:if="${isPurchased}" th:href="@{/mock-test/{id}/take(id=${mock.id})}" class="btn btn-primary">Start Test</a>
+                                <!-- If not purchased -->
+                                <button th:if="${!isPurchased}" class="btn btn-secondary" style="opacity: 0.6; cursor: not-allowed;" disabled>
+                                    🔒 Locked (Enroll First)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reviews -->
+                <div>
+                    <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 20px; margin-top: 30px;">Reviews</h2>
+
+                    <div class="glass-panel" style="padding: 25px; margin-bottom: 20px;">
+                        <div id="review-summary" style="color: var(--text-secondary);">Loading reviews...</div>
+                    </div>
+
+                    <div sec:authorize="hasRole('STUDENT')" th:if="${isPurchased}" class="glass-panel" style="padding: 25px; margin-bottom: 20px;">
+                        <h3 style="font-size: 16px; margin-bottom: 15px;">Leave a Review</h3>
+                        <form id="form-review" onsubmit="submitReview(event)">
+                            <div class="form-group">
+                                <label for="review-rating" class="form-label">Rating</label>
+                                <select id="review-rating" class="form-control" required style="background-color: #111827;">
+                                    <option value="5">5 - Excellent</option>
+                                    <option value="4">4 - Good</option>
+                                    <option value="3">3 - Average</option>
+                                    <option value="2">2 - Poor</option>
+                                    <option value="1">1 - Very Poor</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="review-comment" class="form-label">Comment</label>
+                                <textarea id="review-comment" class="form-control" rows="3" placeholder="Share your experience with this course..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="padding: 10px 24px;">Submit Review</button>
+                        </form>
+                    </div>
+
+                    <div id="reviews-list"></div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Enrollment Widget -->
+            <div class="detail-sidebar">
+                <div class="detail-card glass-panel">
+                    <div class="detail-price-box">
+                        <span class="detail-price-label">Price</span>
+                        <div class="detail-price-value" th:text="'₹' + ${#numbers.formatDecimal(course.price, 0, 0)}">₹999</div>
+                    </div>
+
+                    <div sec:authorize="isAnonymous()">
+                        <a href="/login" class="btn btn-primary" style="width: 100%; padding: 14px;">Log in to Enroll</a>
+                    </div>
+
+                    <div sec:authorize="isAuthenticated()">
+                        <!-- If enrolled/purchased -->
+                        <div th:if="${isPurchased}" class="alert alert-success" style="text-align: center; margin-bottom: 0;">
+                            ✓ Enrolled & Active
+                        </div>
+                        
+                        <!-- If Student & not purchased -->
+                        <div th:if="${!isPurchased && user != null && user.role.name() == 'STUDENT'}">
+                            <button th:onclick="'purchaseCourse(' + ${course.id} + ')'" class="btn btn-primary" style="width: 100%; padding: 14px;">
+                                Buy Now & Unlock Mocks
+                            </button>
+                        </div>
+
+                        <!-- If Trainer and not the owner (or just trainer info) -->
+                        <div th:if="${!isPurchased && user != null && user.role.name() == 'TRAINER'}" class="alert alert-error" style="text-align: center; margin-bottom: 0;">
+                            Trainers cannot buy courses.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 CourseHub Platform. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script th:inline="javascript">
+        /*[Thymeleaf Inline Javascript]*/
+
+        const currentUserId = /*[[${user != null ? user.id : 0}]]*/ 0;
+        const currentCourseId = /*[[${course.id}]]*/ 0;
+        const currentIsPurchased = /*[[${isPurchased}]]*/ false;
+        // Trainers/Admins previewing a course (isPurchased=true without a real
+        // enrollment) shouldn't see a "Mark Complete" button - only students should.
+        const isStudentViewer = /*[[${user != null ? user.role.name() : ''}]]*/ '' === 'STUDENT';
+
+        function showMessage(text, isError) {
+            const box = document.getElementById('msg-box');
+            if (!box) return;
+            box.textContent = text;
+            box.className = 'alert ' + (isError ? 'alert-error' : 'alert-success');
+            box.style.display = 'block';
+            setTimeout(() => { box.style.display = 'none'; }, 4000);
+        }
+
+        async function loadCourseModules(courseId) {
+            const container = document.getElementById('course-modules-container');
+            if (!container) return;
+            try {
+                const response = await fetch(`/module/course/${courseId}`);
+                if (!response.ok) {
+                    let detail = '';
+                    try {
+                        const errBody = await response.clone().json();
+                        detail = errBody.message || JSON.stringify(errBody);
+                    } catch (e) {
+                        detail = await response.text();
+                    }
+                    throw new Error(`Server returned ${response.status}: ${detail}`);
+                }
+                const modules = await response.json();
+                if (!Array.isArray(modules)) {
+                    throw new Error('Expected an array of modules but got: ' + JSON.stringify(modules));
+                }
+
+                if (modules.length === 0) {
+                    container.innerHTML = '<div class="glass-panel" style="padding: 30px; text-align: center; color: var(--text-secondary);">No modules found for this course yet.</div>';
+                    return;
+                }
+
+                container.innerHTML = await Promise.all(modules.map(async (m) => {
+                    const lessonsResponse = await fetch(`/lesson/module/${m.id}`);
+                    if (!lessonsResponse.ok) {
+                        const errText = await lessonsResponse.text();
+                        throw new Error(`Failed to load lessons for module "${m.title}" (HTTP ${lessonsResponse.status}): ${errText}`);
+                    }
+                    const lessons = await lessonsResponse.json();
+                    if (!Array.isArray(lessons)) {
+                        throw new Error(`Expected an array of lessons for module "${m.title}" but got: ` + JSON.stringify(lessons));
+                    }
+
+                    const moduleProgressResponse = await fetch(`/module-progress/module/${m.id}`);
+                    if (!moduleProgressResponse.ok) {
+                        const errText = await moduleProgressResponse.text();
+                        throw new Error(`Failed to load progress for module "${m.title}" (HTTP ${moduleProgressResponse.status}): ${errText}`);
+                    }
+                    const moduleProgressList = await moduleProgressResponse.json();
+                    const studentModuleProgress = Array.isArray(moduleProgressList)
+                        ? moduleProgressList.find(mp => mp.student && mp.student.id === currentUserId)
+                        : undefined;
+
+                    const completedLessons = studentModuleProgress ? studentModuleProgress.completedLessons : 0;
+                    const totalLessons = lessons.length;
+                    const progressPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+                    return `
+                        <div class="glass-panel" style="padding: 25px; margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3 style="font-size: 18px; font-weight: 700; margin: 0;">${m.title}</h3>
+                                <span style="color: var(--text-secondary); font-size: 14px;">${completedLessons}/${totalLessons} lessons completed (${progressPercent}%)</span>
+                            </div>
+                            <div style="background: #1f2937; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 20px;">
+                                <div style="background: #3b82f6; height: 100%; width: ${progressPercent}%"></div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                ${lessons.length === 0 ? `
+                                    <div style="color: var(--text-secondary); font-size: 14px; padding: 10px 0;">No lessons have been added to this module yet.</div>
+                                ` : lessons.map(l => {
+                                    const isCompleted = completedLessons > l.orderIndex;
+                                    return `
+                                        <div style="padding: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; ${isCompleted ? 'background: rgba(34, 197, 94, 0.1); border-color: #22c55e;' : ''}">
+                                            <div>
+                                                <div style="font-weight: 600; color: var(--text-primary);">${l.title}</div>
+                                                <div style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">${l.contentType} | ${l.durationMinutes} mins</div>
+                                            </div>
+                                            ${l.contentType === 'VIDEO' ? `
+                                                <a href="${l.contentUrl}" target="_blank" class="btn btn-sm btn-primary" style="padding: 6px 12px; font-size: 13px;">Watch</a>
+                                            ` : l.contentType === 'PDF' ? `
+                                                <a href="${l.contentUrl}" target="_blank" class="btn btn-sm btn-primary" style="padding: 6px 12px; font-size: 13px;">View</a>
+                                            ` : `
+                                                <button class="btn btn-sm btn-secondary" style="padding: 6px 12px; font-size: 13px;">Start</button>
+                                            `}
+                                            ${isStudentViewer ? `
+                                                <button class="btn btn-sm ${isCompleted ? 'btn-success' : 'btn-outline-success'}" style="padding: 6px 12px; font-size: 13px;" onclick="markLessonComplete(${m.id}, ${l.orderIndex})">
+                                                    ${isCompleted ? '✓ Done' : 'Mark Complete'}
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                })).then(html => html.join(''));
+            } catch (err) {
+                console.error('Error loading course modules:', err);
+                container.innerHTML = `<div class="glass-panel" style="padding: 30px; text-align: center; color: var(--text-secondary);">Error loading modules.<br><small style="opacity:0.7;">${(err.message || err).toString().replace(/</g,'&lt;')}</small></div>`;
+            }
+        }
+
+
+        async function markLessonComplete(moduleId, lessonOrderIndex) {
+            try {
+                const response = await fetch(`/module-progress/update?studentId=${currentUserId}&moduleId=${moduleId}&completedLessons=${lessonOrderIndex + 1}`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    const progress = await response.json();
+                    if (progress.completed) {
+                        showMessage("Module completed! 🎉");
+                    } else {
+                        showMessage("Lesson marked as complete!");
+                    }
+                    loadCourseModules(currentCourseId);
+
+                    // Recalculate and persist overall course progress
+                    const courseProgressResponse = await fetch(`/module-progress/course-progress?studentId=${currentUserId}&courseId=${currentCourseId}`);
+                    const courseProgress = await courseProgressResponse.json();
+
+                    await fetch(`/course-progress/update`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ studentId: currentUserId, courseId: currentCourseId, progressPercentage: courseProgress })
+                    });
+                } else {
+                    showMessage("Failed to mark lesson as complete.", true);
+                }
+            } catch (err) {
+                console.error('Error marking lesson complete:', err);
+                showMessage("Network error.", true);
+            }
+        }
+
+        if (currentIsPurchased) {
+            loadCourseModules(currentCourseId);
+        }
+
+        loadReviews();
+
+        async function loadReviews() {
+            const summaryBox = document.getElementById('review-summary');
+            const listBox = document.getElementById('reviews-list');
+            try {
+                const [avgResponse, reviewsResponse] = await Promise.all([
+                    fetch(`/review/average?courseId=${currentCourseId}`),
+                    fetch(`/review/course?courseId=${currentCourseId}`)
+                ]);
+
+                if (!avgResponse.ok || !reviewsResponse.ok) {
+                    throw new Error(`Server returned ${avgResponse.status}/${reviewsResponse.status}`);
+                }
+
+                const avgRating = await avgResponse.json();
+                const reviews = await reviewsResponse.json();
+
+                if (!Array.isArray(reviews)) {
+                    throw new Error('Expected an array of reviews but got: ' + JSON.stringify(reviews));
+                }
+
+                if (reviews.length === 0) {
+                    summaryBox.innerHTML = 'No reviews yet. Be the first to review this course!';
+                } else {
+                    const rounded = Math.round(avgRating * 10) / 10;
+                    const stars = '★'.repeat(Math.round(avgRating)) + '☆'.repeat(5 - Math.round(avgRating));
+                    summaryBox.innerHTML = `<span style="color: #fbbf24; font-size: 20px; letter-spacing: 2px;">${stars}</span> <span style="font-weight: 700; color: var(--text-primary);">${rounded} / 5</span> <span style="color: var(--text-secondary);">(${reviews.length} review${reviews.length === 1 ? '' : 's'})</span>`;
+                }
+
+                listBox.innerHTML = reviews.map(r => {
+                    const name = r.student && r.student.name ? r.student.name : 'Anonymous';
+                    const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+                    return `
+                        <div class="glass-panel" style="padding: 20px; margin-bottom: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-weight: 700; color: var(--text-primary);">${name}</span>
+                                <span style="color: #fbbf24; letter-spacing: 2px;">${stars}</span>
+                            </div>
+                            <p style="color: var(--text-secondary); margin: 0;">${r.comment || ''}</p>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error('Error loading reviews:', err);
+                summaryBox.innerHTML = `Error loading reviews.<br><small style="opacity:0.7;">${(err.message || err).toString()}</small>`;
+            }
+        }
+
+        async function submitReview(event) {
+            event.preventDefault();
+            const rating = parseInt(document.getElementById('review-rating').value);
+            const comment = document.getElementById('review-comment').value;
+
+            try {
+                const response = await fetch('/review/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ studentId: currentUserId, courseId: currentCourseId, rating, comment })
+                });
+
+                if (response.ok) {
+                    showMessage("Review submitted. Thank you!");
+                    document.getElementById('form-review').reset();
+                    loadReviews();
+                } else {
+                    let detail = '';
+                    try {
+                        const errBody = await response.clone().json();
+                        detail = errBody.message || JSON.stringify(errBody);
+                    } catch (e) {
+                        detail = await response.text();
+                    }
+                    showMessage(`Failed to submit review: ${detail}`, true);
+                }
+            } catch (err) {
+                showMessage("Network error submitting review: " + (err.message || err), true);
+            }
+        }
+        
+        async function purchaseCourse(courseId) {
+            try {
+                // Post request to create order
+                const response = await fetch(`/payment/create-order/${courseId}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.status === 201) {
+                    const orderData = result.data;
+                    openRazorpay(orderData);
+                } else {
+                    alert("Order creation failed: " + (result.message || "Unknown error"));
+                }
+            } catch (err) {
+                alert("Network error starting checkout.");
+            }
+        }
+
+        function openRazorpay(orderData) {
+            const userName = /*[[${user != null ? user.name : ''}]]*/ '';
+            const userEmail = /*[[${user != null ? user.email : ''}]]*/ '';
+
+            const options = {
+                "key": orderData.key,
+                "amount": orderData.amount, // Already in paisa
+                "currency": orderData.currency,
+                "name": "CourseHub",
+                "description": "Course Enrollment Purchase",
+                "order_id": orderData.orderId,
+                "handler": async function (response) {
+                    // Send transaction details to verify signature
+                    const queryParams = new URLSearchParams({
+                        razorpayOrderId: response.razorpay_order_id,
+                        razorpayPaymentId: response.razorpay_payment_id,
+                        razorpaySignature: response.razorpay_signature
+                    });
+                    
+                    const verifyResponse = await fetch(`/payment/verify?${queryParams.toString()}`, {
+                        method: 'POST'
+                    });
+                    
+                    const verifyResult = await verifyResponse.json();
+                    
+                    if (verifyResponse.ok && verifyResult.status === 200) {
+                        alert("Payment successful! You are now enrolled.");
+                        window.location.reload();
+                    } else {
+                        alert("Payment verification failed: " + (verifyResult.message || "Verification Error"));
+                    }
+                },
+                "prefill": {
+                    "name": userName,
+                    "email": userEmail
+                },
+                "theme": {
+                    "color": "#6366f1"
+                }
+            };
+            
+            const rzp = new Razorpay(options);
+            rzp.open();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+package com.jsp.CourseHub.entity;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.OneToMany;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+@Setter
+@Getter
+@Entity
+//@DiscriminatorValue("TRAINER")
+public class Trainer extends User{
+	@NotBlank(message = "Specialization should not be empty")
+	private String specialization;
+
+	@Min(value = 0, message = "Experience cannot be negative")
+	private int experience;
+
+	@OneToMany(mappedBy = "trainer", cascade = CascadeType.ALL)
+	@JsonIgnore
+	private List<Course> courses;
+
+}

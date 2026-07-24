@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email - CourseHub</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+</head>
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-card glass-panel">
+            <a href="/" class="brand-logo" style="display: block; text-align: center; margin-bottom: 24px;">CourseHub</a>
+            <h2 class="auth-title">Verify Your Email</h2>
+            <p class="auth-subtitle">We have sent a 6-digit OTP code to your registered email address.</p>
+
+            <div id="alert-success" class="alert alert-success" style="display: none;"></div>
+            <div id="alert-error" class="alert alert-error" style="display: none;"></div>
+
+            <form onsubmit="submitOtp(event)">
+                <input type="hidden" id="userId" th:value="${userId}">
+                
+                <div th:if="${userId == null}" class="form-group">
+                    <label for="userIdInput" class="form-label">User ID</label>
+                    <input type="number" id="userIdInput" class="form-control" placeholder="Enter your User ID" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="otp" class="form-label">One-Time Password (OTP)</label>
+                    <input type="text" id="otp" class="form-control" placeholder="123456" required maxlength="6" minlength="6" style="text-align: center; letter-spacing: 6px; font-size: 20px; font-weight: 700;">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px; padding: 14px;">Verify Email</button>
+            </form>
+
+            <p style="text-align: center; margin-top: 24px; color: var(--text-secondary); font-size: 14px;">
+                Didn't get code? 
+                <span id="timer-text">Resend in <span id="timer-count">60</span>s</span>
+                <a href="javascript:void(0)" id="resend-link" onclick="resendOtp()" style="display: none; color: var(--primary-color); text-decoration: none; font-weight: 600;">Resend OTP</a>
+            </p>
+            <p style="text-align: center; margin-top: 12px; font-size: 14px;">
+                <a href="/login" style="color: var(--text-secondary); text-decoration: none;">Back to Login</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let countdown = 60;
+        let timerInterval;
+
+        function startTimer() {
+            countdown = 60;
+            document.getElementById('timer-text').style.display = 'inline';
+            document.getElementById('resend-link').style.display = 'none';
+            document.getElementById('timer-count').textContent = countdown;
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                countdown--;
+                document.getElementById('timer-count').textContent = countdown;
+                if (countdown <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('timer-text').style.display = 'none';
+                    document.getElementById('resend-link').style.display = 'inline';
+                }
+            }, 1000);
+        }
+
+        async function resendOtp() {
+            let userId = document.getElementById('userId') ? document.getElementById('userId').value : null;
+            if (!userId) {
+                userId = document.getElementById('userIdInput').value;
+            }
+            if (!userId) {
+                alert('Please enter your User ID first to resend OTP.');
+                return;
+            }
+            
+            const errBox = document.getElementById('alert-error');
+            const successBox = document.getElementById('alert-success');
+            errBox.style.display = 'none';
+            successBox.style.display = 'none';
+
+            try {
+                const response = await fetch(`/user/resend-otp?userId=${userId}`, {
+                    method: 'POST'
+                });
+                const resultText = await response.text();
+                if (response.ok) {
+                    successBox.textContent = "OTP resent successfully! Check your email.";
+                    successBox.style.display = 'block';
+                    startTimer();
+                } else {
+                    errBox.textContent = resultText || "Failed to resend OTP.";
+                    errBox.style.display = 'block';
+                }
+            } catch (err) {
+                errBox.textContent = "Network error occurred while resending OTP.";
+                errBox.style.display = 'block';
+            }
+        }
+
+        async function submitOtp(event) {
+            event.preventDefault();
+            
+            let userId = document.getElementById('userId') ? document.getElementById('userId').value : null;
+            if (!userId) {
+                userId = document.getElementById('userIdInput').value;
+            }
+            const otp = document.getElementById('otp').value;
+            
+            const errBox = document.getElementById('alert-error');
+            const successBox = document.getElementById('alert-success');
+            
+            errBox.style.display = 'none';
+            successBox.style.display = 'none';
+
+            try {
+                // Post request to /user/verify as RequestParameters
+                const response = await fetch(`/user/verify?userId=${userId}&otp=${otp}`, {
+                    method: 'POST'
+                });
+                
+                const resultText = await response.text();
+                
+                if (response.ok && resultText.includes("Verified")) {
+                    successBox.textContent = "Email verified successfully! Redirecting to login...";
+                    successBox.style.display = 'block';
+                    setTimeout(() => {
+                        window.location.href = "/login?verified=true";
+                    }, 2000);
+                } else {
+                    errBox.textContent = resultText || "Verification failed. Invalid OTP.";
+                    errBox.style.display = 'block';
+                }
+            } catch (err) {
+                errBox.textContent = "Network error occurred.";
+                errBox.style.display = 'block';
+            }
+        }
+
+        // Start the timer on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            startTimer();
+        });
+    </script>
+</body>
+</html>

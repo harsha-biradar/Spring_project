@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - CourseHub</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+</head>
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-card glass-panel">
+            <a href="/" class="brand-logo" style="display: block; text-align: center; margin-bottom: 24px;">CourseHub</a>
+            <h2 class="auth-title">Welcome Back</h2>
+            <p class="auth-subtitle">Log in to access your courses and mock tests</p>
+
+            <div th:if="${param.error}" class="alert alert-error">
+                Invalid email or password / Account is not verified.
+            </div>
+            <div th:if="${param.logout}" class="alert alert-success">
+                You have been logged out successfully.
+            </div>
+            <div th:if="${logoutMessage}" class="alert alert-success" th:text="${logoutMessage}"></div>
+            <div th:if="${loginError}" class="alert alert-error" th:text="${loginError}"></div>
+
+            <form th:action="@{/login}" method="post">
+                <div class="form-group">
+                    <label for="username" class="form-label">Email Address</label>
+                    <input type="email" id="username" name="username" class="form-control" placeholder="name@email.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+                    <div style="text-align: right; margin-top: 6px;">
+                        <a href="/forgot-password" style="color: var(--primary-color); text-decoration: none; font-size: 13px; font-weight: 500;">Forgot Password?</a>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px; padding: 14px;">Log In</button>
+            </form>
+
+            <p style="text-align: center; margin-top: 24px; color: var(--text-secondary); font-size: 14px;">
+                Don't have an account? <a href="/register" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">Sign Up</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

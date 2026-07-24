@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CourseHub - Learn & Test</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+</head>
+<body>
+    <header class="glass-header">
+        <div class="container nav-wrapper">
+            <a href="/" class="brand-logo">CourseHub</a>
+            <nav class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/swagger-ui/index.html" class="nav-link" target="_blank">APIs Docs</a>
+                
+                <span sec:authorize="isAuthenticated()">
+                    <!-- If Student -->
+                    <a sec:authorize="hasRole('STUDENT')" href="/student/dashboard" class="btn btn-secondary">Dashboard</a>
+                    
+                    <!-- If Trainer -->
+                    <a sec:authorize="hasAnyRole('TRAINER','ADMIN')" href="/trainer/dashboard" class="btn btn-secondary">Dashboard</a>
+                    
+                    <span style="color: var(--text-secondary); margin-right: 12px; font-weight: 500;">
+                        Hello, <span th:text="${user != null ? user.name : 'User'}">Name</span>
+                    </span>
+                    <a href="/logout" class="btn btn-danger btn-sm" style="padding: 6px 12px; font-size: 13px;">Logout</a>
+                </span>
+                
+                <span sec:authorize="isAnonymous()">
+                    <a href="/login" class="nav-link" style="margin-right: 15px;">Login</a>
+                    <a href="/register" class="btn btn-primary">Sign Up</a>
+                </span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <h1 class="hero-title">Master Your Skills & Take Mock Tests</h1>
+            <p class="hero-subtitle">Explore premium courses from top trainers and practice with real-time graded mock tests to validate your learning.</p>
+        </section>
+
+        <!-- Course Catalog Section -->
+        <section style="margin-top: 20px;">
+            <h2 style="font-size: 28px; margin-bottom: 24px; font-weight: 700; text-align: center;">Explore Courses</h2>
+            
+            <div th:if="${courses.isEmpty()}" class="glass-panel" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                No courses available at the moment.
+            </div>
+            
+            <div class="course-grid">
+                <div th:each="course : ${courses}" class="course-card glass-panel" th:onclick="'window.location.href=\'/courses/' + ${course.id} + '\''">
+                    <div class="course-body">
+                        <span class="course-category" th:text="${course.category != null ? course.category.categoryName : 'General'}">Category</span>
+                        <h3 class="course-title" th:text="${course.title}">Course Title</h3>
+                        <p class="course-desc" th:text="${course.discription}">Course short description...</p>
+                        
+                        <div class="course-footer">
+                            <span class="course-price" th:text="'₹' + ${#numbers.formatDecimal(course.price, 0, 0)}">₹999</span>
+                            <span class="course-trainer" th:text="'By ' + ${course.trainer != null ? course.trainer.name : 'Unknown'}">Trainer</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 CourseHub Platform. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>

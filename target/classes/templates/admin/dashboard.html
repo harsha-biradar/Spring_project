@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - CourseHub</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/admin/dashboard">Admin Dashboard</a>
+            <div class="navbar-nav">
+                <a class="nav-link" href="/admin/students">Students</a>
+                <a class="nav-link" href="/admin/trainers">Trainers</a>
+                <a class="nav-link" href="/admin/courses">Courses</a>
+                <a class="nav-link" href="/admin/enrollments">Enrollments</a>
+                <a class="nav-link" href="/trainer/dashboard">Manage Categories</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 class="mb-4">Dashboard Statistics</h1>
+        
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card text-white bg-primary mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Students</h5>
+                        <p class="card-text display-4" th:text="${statistics.totalStudents}">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-success mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Trainers</h5>
+                        <p class="card-text display-4" th:text="${statistics.totalTrainers}">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-info mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Courses</h5>
+                        <p class="card-text display-4" th:text="${statistics.totalCourses}">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-warning mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Enrollments</h5>
+                        <p class="card-text display-4" th:text="${statistics.totalEnrollments}">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card text-white bg-secondary mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Completed Courses</h5>
+                        <p class="card-text display-4" th:text="${statistics.completedCourses}">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

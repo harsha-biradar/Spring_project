@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - CourseHub</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+</head>
+<body>
+    <header class="glass-header">
+        <div class="container nav-wrapper">
+            <a href="/" class="brand-logo">CourseHub</a>
+            <nav class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <span style="color: var(--text-secondary); font-weight: 500;">
+                    Dashboard: <span th:text="${user.name}">User Name</span>
+                </span>
+                <a href="/logout" class="btn btn-danger btn-sm" style="padding: 6px 12px; font-size: 13px;">Logout</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="dashboard-grid">
+            <!-- Sidebar Panel Navigation -->
+            <div class="sidebar-menu glass-panel" style="padding: 20px; height: fit-content;">
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; color: var(--text-primary);">Dashboard</h3>
+                <div id="btn-courses" class="menu-item active" onclick="switchPane('courses')">My Courses</div>
+                <div sec:authorize="hasRole('ADMIN')" id="btn-categories" class="menu-item" onclick="switchPane('categories')">Categories</div>
+                <div sec:authorize="hasRole('TRAINER')" id="btn-add-course" class="menu-item" onclick="switchPane('add-course')">Add Course</div>
+                <div sec:authorize="hasRole('TRAINER')" id="btn-modules" class="menu-item" onclick="switchPane('modules')">Manage Modules</div>
+                <div sec:authorize="hasRole('TRAINER')" id="btn-add-mock" class="menu-item" onclick="switchPane('add-mock')">Create Mock Test</div>
+                <div sec:authorize="hasRole('TRAINER')" id="btn-add-question" class="menu-item" onclick="switchPane('add-question')">Add Questions</div>
+
+                <div sec:authorize="hasRole('ADMIN')" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <h3 style="font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Admin Panel</h3>
+                    <a href="/admin/dashboard" class="menu-item" style="display:block; text-decoration:none;">Overview</a>
+                    <a href="/admin/students" class="menu-item" style="display:block; text-decoration:none;">Approve Students</a>
+                    <a href="/admin/trainers" class="menu-item" style="display:block; text-decoration:none;">Approve Trainers</a>
+                    <a href="/admin/courses" class="menu-item" style="display:block; text-decoration:none;">All Courses</a>
+                    <a href="/admin/enrollments" class="menu-item" style="display:block; text-decoration:none;">Enrollments</a>
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="dashboard-content">
+                <div id="msg-box" class="alert" style="display: none;"></div>
+
+                <!-- Pane: My Courses -->
+                <div id="pane-courses" class="tab-pane active">
+                    <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 20px;">My Courses</h2>
+                    
+                    <div th:if="${courses.isEmpty()}" class="glass-panel" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        You have not created any courses yet. Click "Add Course" to get started!
+                    </div>
+
+                    <div class="course-grid">
+                        <div th:each="course : ${courses}" class="course-card glass-panel" th:onclick="'window.location.href=\'/courses/' + ${course.id} + '\''">
+                            <div class="course-body">
+                                <span class="course-category" th:text="${course.category != null ? course.category.categoryName : 'General'}">Category</span>
+                                <h3 class="course-title" th:text="${course.title}">Course Title</h3>
+                                <p class="course-desc" th:text="${course.discription}">Short description...</p>
+                                
+                                <div class="course-footer" onclick="event.stopPropagation()">
+                                    <span class="course-price" th:text="'₹' + ${#numbers.formatDecimal(course.price, 0, 0)}">₹999</span>
+                                    <div sec:authorize="hasRole('TRAINER')" style="display: flex; gap: 8px;">
+                                        <button class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 13px;"
+                                                th:data-id="${course.id}"
+                                                th:data-title="${course.title}"
+                                                th:data-desc="${course.discription}"
+                                                th:data-price="${course.price}"
+                                                th:data-duration="${course.duration}"
+                                                th:data-category-id="${course.category != null ? course.category.id : ''}"
+                                                onclick="editCourse(this)">Edit</button>
+                                        <button class="btn btn-danger btn-sm" style="padding: 6px 12px; font-size: 13px;"
+                                                th:data-id="${course.id}"
+                                                onclick="deleteCourse(this)">Delete</button>
+                                    </div>
+                                    <span sec:authorize="!hasRole('TRAINER')" class="course-trainer" th:text="${course.duration} + ' Hours'">Duration</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pane: Categories -->
+                <div sec:authorize="hasRole('ADMIN')" id="pane-categories" class="tab-pane">
+                    <div class="glass-panel" style="padding: 40px; margin-bottom: 24px;">
+                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 24px;">Add Category</h2>
+
+                        <form id="form-category" onsubmit="submitCategory(event)">
+                            <input type="hidden" id="edit-category-id" value="">
+                            <div class="form-group">
+                                <label for="category-name" class="form-label">Category Name</label>
+                                <input type="text" id="category-name" name="categoryName" class="form-control" placeholder="Java Development" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="category-desc" class="form-label">Description</label>
+                                <textarea id="category-desc" name="description" class="form-control" rows="3" placeholder="Short category description..." style="resize: vertical;"></textarea>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button type="submit" id="btn-save-category" class="btn btn-primary" style="margin-top: 10px; padding: 12px 30px;">Save Category</button>
+                                <button type="button" id="btn-cancel-category-edit" class="btn btn-secondary" style="margin-top: 10px; padding: 12px 30px; display: none;" onclick="cancelCategoryEdit()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 30px;">
+                        <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 20px;">Existing Categories</h2>
+                        <div th:if="${categories.isEmpty()}" style="color: var(--text-secondary);">
+                            No categories added yet.
+                        </div>
+                        <div th:each="cat : ${categories}" style="padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 700; color: var(--text-primary);" th:text="${cat.categoryName}">Category Name</div>
+                                <div style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;" th:text="${cat.description != null && !cat.description.isEmpty() ? cat.description : 'No description'}">Description</div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                               <button
+    class="btn btn-secondary btn-sm"
+    style="padding: 6px 12px; font-size: 13px;"
+    th:data-id="${cat.id}"
+    th:data-name="${cat.categoryName}"
+    th:data-description="${cat.description}"
+    onclick="editCategory(this)">
+    Edit
+</button>
+
+<button
+    class="btn btn-danger btn-sm"
+    style="padding: 6px 12px; font-size: 13px;"
+    th:onclick="|deleteCategory(${cat.id})|">
+    Delete
+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pane: Add Course -->
+                <div sec:authorize="hasRole('TRAINER')" id="pane-add-course" class="tab-pane">
+                    <div class="glass-panel" style="padding: 40px;">
+                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 24px;">Create New Course</h2>
+                        
+                        <form id="form-course" onsubmit="submitCourse(event)">
+                            <input type="hidden" id="edit-course-id" value="">
+                            <div class="form-group">
+                                <label for="course-title" class="form-label">Course Title</label>
+                                <input type="text" id="course-title" name="title" class="form-control" placeholder="Complete Java Development" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="course-desc" class="form-label">Description</label>
+                                <textarea id="course-desc" name="discription" class="form-control" rows="4" placeholder="Course syllabus and key features..." required style="resize: vertical;"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="course-price" class="form-label">Price (INR)</label>
+                                <input type="number" id="course-price" name="price" class="form-control" placeholder="999" required min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="course-duration" class="form-label">Duration (Hours)</label>
+                                <input type="number" id="course-duration" name="duration" class="form-control" placeholder="40" required min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="course-category" class="form-label">Category</label>
+                                <select id="course-category" name="categoryId" class="form-control" required style="background-color: #111827;">
+                                    <option value="" disabled selected>Select Category</option>
+                                    <option th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.categoryName}">Category Names</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button type="submit" id="btn-save-course" class="btn btn-primary" style="margin-top: 10px; padding: 12px 30px;">Publish Course</button>
+                                <button type="button" id="btn-cancel-course-edit" class="btn btn-secondary" style="margin-top: 10px; padding: 12px 30px; display: none;" onclick="cancelCourseEdit()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Pane: Manage Modules -->
+                <div sec:authorize="hasRole('TRAINER')" id="pane-modules" class="tab-pane">
+                    <div class="glass-panel" style="padding: 40px; margin-bottom: 24px;">
+                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 24px;">Add Module</h2>
+                        
+                        <form id="form-module" onsubmit="submitModule(event)">
+                            <input type="hidden" id="edit-module-id" value="">
+                            <div class="form-group">
+                                <label for="module-course" class="form-label">Select Course</label>
+                                <select id="module-course" name="courseId" class="form-control" required style="background-color: #111827;" onchange="loadModules(this.value)">
+                                    <option value="" disabled selected>Select Course</option>
+                                    <option th:each="course : ${courses}" th:value="${course.id}" th:text="${course.title}">Course Title</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="module-title" class="form-label">Module Title</label>
+                                <input type="text" id="module-title" name="title" class="form-control" placeholder="Introduction to Java" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="module-desc" class="form-label">Description</label>
+                                <textarea id="module-desc" name="description" class="form-control" rows="3" placeholder="Module description..." style="resize: vertical;"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="module-order" class="form-label">Order Index</label>
+                                <input type="number" id="module-order" name="orderIndex" class="form-control" placeholder="1" required min="1">
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button type="submit" id="btn-save-module" class="btn btn-primary" style="margin-top: 10px; padding: 12px 30px;">Save Module</button>
+                                <button type="button" id="btn-cancel-module-edit" class="btn btn-secondary" style="margin-top: 10px; padding: 12px 30px; display: none;" onclick="cancelModuleEdit()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 30px; margin-bottom: 24px;">
+                        <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 20px;">Course Modules</h2>
+                        <div id="modules-container">
+                            <p style="color: var(--text-secondary);">Select a course to view its modules.</p>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 40px;">
+                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 24px;">Add Lesson</h2>
+                        
+                        <form id="form-lesson" onsubmit="submitLesson(event)">
+                            <input type="hidden" id="edit-lesson-id" value="">
+                            <div class="form-group">
+                                <label for="lesson-module" class="form-label">Select Module</label>
+                                <select id="lesson-module" name="moduleId" class="form-control" required style="background-color: #111827;" onchange="loadLessons(this.value)">
+                                    <option value="" disabled selected>Select Course First</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="lesson-title" class="form-label">Lesson Title</label>
+                                <input type="text" id="lesson-title" name="title" class="form-control" placeholder="Java Variables" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="lesson-type" class="form-label">Content Type</label>
+                                <select id="lesson-type" name="contentType" class="form-control" required style="background-color: #111827;">
+                                    <option value="VIDEO">Video</option>
+                                    <option value="TEXT">Text</option>
+                                    <option value="PDF">PDF</option>
+                                    <option value="QUIZ">Quiz</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="lesson-url" class="form-label">Content URL (for Video/PDF)</label>
+                                <input type="text" id="lesson-url" name="contentUrl" class="form-control" placeholder="https://youtube.com/...">
+                            </div>
+                            <div class="form-group">
+                                <label for="lesson-text" class="form-label">Text Content (for Text lessons)</label>
+                                <textarea id="lesson-text" name="textContent" class="form-control" rows="4" placeholder="Lesson content..." style="resize: vertical;"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="lesson-order" class="form-label">Order Index</label>
+                                <input type="number" id="lesson-order" name="orderIndex" class="form-control" placeholder="1" required min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="lesson-duration" class="form-label">Duration (Minutes)</label>
+                                <input type="number" id="lesson-duration" name="durationMinutes" class="form-control" placeholder="10" required min="1">
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button type="submit" id="btn-save-lesson" class="btn btn-primary" style="margin-top: 10px; padding: 12px 30px;">Save Lesson</button>
+                                <button type="button" id="btn-cancel-lesson-edit" class="btn btn-secondary" style="margin-top: 10px; padding: 12px 30px; display: none;" onclick="cancelLessonEdit()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 30px;">
+                        <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 20px;">Module Lessons</h2>
+                        <div id="lessons-container">
+                            <p style="color: var(--text-secondary);">Select a module to view its lessons.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pane: Create Mock Test -->
+                <div sec:authorize="hasRole('TRAINER')" id="pane-add-mock" class="tab-pane">
+                    <div class="glass-panel" style="padding: 40px; margin-bottom: 24px;">
+                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 24px;">Create Mock Test</h2>
+                        
+                        <form id="form-mock" onsubmit="submitMock(event)">
+                            <div class="form-group">
+                                <label for="mock-course" class="form-label">Target Course</label>
+                                <select id="mock-course" name="courseId" class="form-control" required style="background-color: #111827;" onchange="loadMockTestsForManagement(this.value)">
+                                    <option value="" disabled selected>Select Course</option>
+                                    <option th:each="course : ${courses}" th:value="${course.id}" th:text="${course.title}">Course Title</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="mock-title" class="form-label">Mock Test Title</label>
+                                <input type="text" id="mock-title" name="title" class="form-control" placeholder="Core Java Fundamentals Quiz" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="mock-duration" class="form-label">Duration (Minutes)</label>
+                                <input type="number" id="mock-duration" name="duration" class="form-control" placeholder="30" required min="1">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="margin-top: 10px; padding: 12px 30px;">Create Mock</button>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 30px; margin-bottom: 24px;">
+                        <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 20px;">Mock Tests for this Course</h2>
+                        <div id="mocks-list-container">
+                            <p style="color: var(--text-secondary);">Select a course above to view and manage its mock tests.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pane: Add Questions -->
+                <div sec:authorize="hasRole('TRAINER')" id="pane-add-question" class="tab-pane">
+                    <div class="glass-panel" style="padding: 40px;">
+                        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 24px;">Add Question to Mock Test</h2>
+                        
+                        <form id="form-question" onsubmit="submitQuestion(event)">
+                            <div class="form-group">
+                                <label for="q-course" class="form-label">Course</label>
+                                <select id="q-course" class="form-control" required style="background-color: #111827;" onchange="loadMockTests(this.value)">
+                                    <option value="" disabled selected>Select Course</option>
+                                    <option th:each="course : ${courses}" th:value="${course.id}" th:text="${course.title}">Course Title</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="q-mock" class="form-label">Target Mock Test</label>
+                                <select id="q-mock" name="mockTestId" class="form-control" required style="background-color: #111827;">
+                                    <option value="" disabled selected>Select Mock Test (Choose Course First)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="q-text" class="form-label">Question Text</label>
+                                <input type="text" id="q-text" name="questionText" class="form-control" placeholder="What is the parent class of all classes in Java?" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="q-optA" class="form-label">Option A</label>
+                                <input type="text" id="q-optA" name="optionA" class="form-control" placeholder="String" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="q-optB" class="form-label">Option B</label>
+                                <input type="text" id="q-optB" name="optionB" class="form-control" placeholder="Object" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="q-optC" class="form-label">Option C</label>
+                                <input type="text" id="q-optC" name="optionC" class="form-control" placeholder="Class" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="q-optD" class="form-label">Option D</label>
+                                <input type="text" id="q-optD" name="optionD" class="form-control" placeholder="System" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="q-correct" class="form-label">Correct Option</label>
+                                <select id="q-correct" name="correctOption" class="form-control" required style="background-color: #111827;">
+                                    <option value="" disabled selected>Choose Correct Answer</option>
+                                    <option value="A">A</option>
+                                    <option value="B">B</option>
+                                    <option value="C">C</option>
+                                    <option value="D">D</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="margin-top: 10px; padding: 12px 30px;">Add Question</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 CourseHub Platform. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script th:inline="javascript">
+        /*[Thymeleaf Inline Javascript]*/
+        function switchPane(pane) {
+            const panes = ['courses', 'categories', 'add-course', 'modules', 'add-mock', 'add-question'];
+            panes.forEach(p => {
+                const button = document.getElementById(`btn-${p}`);
+                const tabPane = document.getElementById(`pane-${p}`);
+                if (!button || !tabPane) {
+                    return;
+                }
+                if (p === pane) {
+                    button.classList.add('active');
+                    tabPane.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                    tabPane.classList.remove('active');
+                }
+            });
+            document.getElementById('msg-box').style.display = 'none';
+        }
+
+        function showMessage(text, isError = false) {
+            const box = document.getElementById('msg-box');
+            box.textContent = text;
+            box.className = isError ? 'alert alert-error' : 'alert alert-success';
+            box.style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function submitCategory(event) {
+            event.preventDefault();
+            const form = event.target;
+            const editId = document.getElementById('edit-category-id').value;
+            const categoryName = document.getElementById('category-name').value.trim();
+            const description = document.getElementById('category-desc').value.trim();
+
+            try {
+                let response;
+                if (editId) {
+                    response = await fetch(`/category/update/${editId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({ categoryName, description })
+                    });
+                } else {
+                    response = await fetch('/category/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({ categoryName, description })
+                    });
+                }
+
+                if (response.ok) {
+                    const msg = editId ? "Category updated successfully!" : "Category saved successfully!";
+                    showMessage(msg + " Reloading dashboard in 1s...");
+                    form.reset();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    let detail = '';
+                    try {
+                        const errBody = await response.clone().json();
+                        detail = errBody.message || Object.values(errBody).join(', ') || JSON.stringify(errBody);
+                    } catch (e) {
+                        detail = await response.text();
+                    }
+                    showMessage(`Failed to save category (HTTP ${response.status}): ${detail || 'Please check the category name.'}`, true);
+                }
+            } catch (err) {
+                showMessage("Network error saving category: " + (err.message || err), true);
+            }
+        }
+
+        function editCategory(btn) {
+            const id = btn.dataset.id;
+            const name = btn.dataset.name;
+            const desc = btn.dataset.description;
+            document.getElementById('edit-category-id').value = id;
+            document.getElementById('category-name').value = name;
+            document.getElementById('category-desc').value = desc || '';
+            document.getElementById('btn-save-category').textContent = 'Update Category';
+            document.getElementById('btn-cancel-category-edit').style.display = 'inline-flex';
+            document.querySelector('#pane-categories h2').textContent = 'Edit Category';
+            window.scrollTo({ top: document.getElementById('form-category').offsetTop - 100, behavior: 'smooth' });
+        }
+
+        function cancelCategoryEdit() {
+            document.getElementById('edit-category-id').value = '';
+            document.getElementById('form-category').reset();
+            document.getElementById('btn-save-category').textContent = 'Save Category';
+            document.getElementById('btn-cancel-category-edit').style.display = 'none';
+            document.querySelector('#pane-categories h2').textContent = 'Add Category';
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm("Are you sure you want to delete this category? All courses in this category will also be deleted.")) {
+                return;
+            }
+            try {
+                const response = await fetch(`/category/delete/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    showMessage("Category deleted successfully!");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    const errorText = await response.text();
+                    showMessage(errorText || "Failed to delete category.", true);
+                }
+            } catch (err) {
+                showMessage("Network error deleting category.", true);
+            }
+        }
+
+        async function submitCourse(event) {
+            event.preventDefault();
+            const form = event.target;
+            const editId = document.getElementById('edit-course-id').value;
+            const title = document.getElementById('course-title').value;
+            const discription = document.getElementById('course-desc').value;
+            const price = parseFloat(document.getElementById('course-price').value);
+            const duration = parseInt(document.getElementById('course-duration').value);
+            const categoryId = parseInt(document.getElementById('course-category').value);
+
+            if (!categoryId || Number.isNaN(categoryId)) {
+                showMessage("Please select a category before saving the course.", true);
+                return;
+            }
+
+            try {
+                let response;
+                if (editId) {
+                    response = await fetch(`/course/update/${editId}?categoryId=${categoryId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({ title, discription, price, duration })
+                    });
+                } else {
+                    response = await fetch(`/course/save?categoryId=${categoryId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({ title, discription, price, duration })
+                    });
+                }
+
+                if (response.ok) {
+                    const msg = editId ? "Course updated successfully!" : "Course published successfully!";
+                    showMessage(msg + " Reloading dashboard in 2s...");
+                    form.reset();
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    let detail = '';
+                    try {
+                        const errBody = await response.clone().json();
+                        detail = errBody.message || Object.values(errBody).join(', ') || JSON.stringify(errBody);
+                    } catch (e) {
+                        detail = await response.text();
+                    }
+                    showMessage(`Failed to save course (HTTP ${response.status}): ${detail || 'Verify data input.'}`, true);
+                }
+            } catch (err) {
+                showMessage("Network error saving course: " + (err.message || err), true);
+            }
+        }
+
+        function editCourse(btn) {
+            const id = btn.dataset.id;
+            const title = btn.dataset.title;
+            const desc = btn.dataset.desc;
+            const price = btn.dataset.price;
+            const duration = btn.dataset.duration;
+            const categoryId = btn.dataset.categoryId;
+
+            switchPane('add-course');
+            document.getElementById('edit-course-id').value = id;
+            document.getElementById('course-title').value = title;
+            document.getElementById('course-desc').value = desc;
+            document.getElementById('course-price').value = price;
+            document.getElementById('course-duration').value = duration;
+            document.getElementById('course-category').value = categoryId || '';
+            document.getElementById('btn-save-course').textContent = 'Update Course';
+            document.getElementById('btn-cancel-course-edit').style.display = 'inline-flex';
+            document.querySelector('#pane-add-course h2').textContent = 'Edit Course';
+        }
+
+        function cancelCourseEdit() {
+            document.getElementById('edit-course-id').value = '';
+            document.getElementById('form-course').reset();
+            document.getElementById('btn-save-course').textContent = 'Publish Course';
+            document.getElementById('btn-cancel-course-edit').style.display = 'none';
+            document.querySelector('#pane-add-course h2').textContent = 'Create New Course';
+            switchPane('courses');
+        }
+
+        async function deleteCourse(btn) {
+            const id = btn.dataset.id;
+            if (!confirm("Are you sure you want to delete this course? All associated data like mock tests will also be deleted.")) {
+                return;
+            }
+            try {
+                const response = await fetch(`/course/delete/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    showMessage("Course deleted successfully!");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    const text = await response.text();
+                    showMessage(text || "Failed to delete course.", true);
+                }
+            } catch (err) {
+                showMessage("Network error deleting course.", true);
+            }
+        }
+
+        async function submitMock(event) {
+            event.preventDefault();
+            const form = event.target;
+            const courseId = parseInt(document.getElementById('mock-course').value);
+            const title = document.getElementById('mock-title').value;
+            const duration = parseInt(document.getElementById('mock-duration').value);
+
+            try {
+                const response = await fetch(`/mock-test/save?courseId=${courseId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ title, duration })
+                });
+
+                if (response.ok) {
+                    showMessage("Mock test created successfully!");
+                    form.reset();
+                    document.getElementById('mock-course').value = String(courseId);
+                    loadMockTestsForManagement(courseId);
+                } else {
+                    const errorText = await response.text();
+                    showMessage(errorText || "Failed to create mock test.", true);
+                }
+            } catch (err) {
+                showMessage("Network error saving mock test.", true);
+            }
+        }
+
+        async function loadMockTests(courseId) {
+            const dropdown = document.getElementById('q-mock');
+            dropdown.innerHTML = '<option value="" disabled selected>Loading Mock Tests...</option>';
+
+            try {
+                const response = await fetch(`/mock-test/course/${courseId}`);
+                const result = await response.json();
+                
+                if (response.ok && result.status === 200) {
+                    const mocks = result.data;
+                    dropdown.innerHTML = '<option value="" disabled selected>Select Mock Test</option>';
+                    if (mocks.length === 0) {
+                        dropdown.innerHTML = '<option value="" disabled>No Mock Tests found for this course</option>';
+                    } else {
+                        mocks.forEach(m => {
+                            const option = document.createElement('option');
+                            option.value = m.id;
+                            option.textContent = m.title;
+                            dropdown.appendChild(option);
+                        });
+                    }
+                } else {
+                    dropdown.innerHTML = '<option value="" disabled>Error loading mock tests</option>';
+                }
+            } catch (err) {
+                dropdown.innerHTML = '<option value="" disabled>Network error loading mock tests</option>';
+            }
+        }
+
+        async function loadMockTestsForManagement(courseId) {
+            const container = document.getElementById('mocks-list-container');
+            container.innerHTML = '<p style="color: var(--text-secondary);">Loading mock tests...</p>';
+
+            try {
+                const response = await fetch(`/mock-test/course/${courseId}`);
+                if (!response.ok) {
+                    let detail = '';
+                    try {
+                        const errBody = await response.clone().json();
+                        detail = errBody.message || JSON.stringify(errBody);
+                    } catch (e) {
+                        detail = await response.text();
+                    }
+                    throw new Error(`Server returned ${response.status}: ${detail}`);
+                }
+                const result = await response.json();
+                const mocks = result.data || [];
+
+                if (mocks.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-secondary);">No mock tests found for this course.</p>';
+                    return;
+                }
+
+                container.innerHTML = mocks.map(m => `
+                    <div style="padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-primary);">${escapeHtml(m.title)}</div>
+                            <div style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">${m.duration} Mins | ${(m.questions || []).length} Questions</div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-danger btn-sm" style="padding: 6px 12px; font-size: 13px;"
+                                    onclick="deleteMockTest(${m.id}, ${courseId})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Error loading mock tests:', err);
+                container.innerHTML = `<p style="color: var(--text-secondary);">Error loading mock tests.<br><small style="opacity:0.7;">${(err.message || err).toString().replace(/</g,'&lt;')}</small></p>`;
+            }
+        }
+
+        async function deleteMockTest(id, courseId) {
+            if (!confirm('Delete this mock test? This will also delete all its questions and student attempts. This cannot be undone.')) {
+                return;
+            }
+            try {
+                const response = await fetch(`/mock-test/delete/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    showMessage("Mock test deleted successfully!");
+                    loadMockTestsForManagement(courseId);
+                } else {
+                    let detail = '';
+                    try {
+                        const errBody = await response.clone().json();
+                        detail = errBody.message || JSON.stringify(errBody);
+                    } catch (e) {
+                        detail = await response.text();
+                    }
+                    showMessage(`Failed to delete mock test (HTTP ${response.status}): ${detail}`, true);
+                }
+            } catch (err) {
+                showMessage("Network error deleting mock test: " + (err.message || err), true);
+            }
+        }
+
+        async function submitQuestion(event) {
+            event.preventDefault();
+            const form = event.target;
+            const mockTestId = parseInt(document.getElementById('q-mock').value);
+            const questionText = document.getElementById('q-text').value;
+            const optionA = document.getElementById('q-optA').value;
+            const optionB = document.getElementById('q-optB').value;
+            const optionC = document.getElementById('q-optC').value;
+            const optionD = document.getElementById('q-optD').value;
+            const correctOption = document.getElementById('q-correct').value;
+
+            try {
+                const response = await fetch(`/mock-test/${mockTestId}/add-question`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ questionText, optionA, optionB, optionC, optionD, correctOption })
+                });
+
+                if (response.ok) {
+                    showMessage("Question added successfully to mock test!");
+                    // Clear inputs except course and mock dropdowns
+                    document.getElementById('q-text').value = '';
+                    document.getElementById('q-optA').value = '';
+                    document.getElementById('q-optB').value = '';
+                    document.getElementById('q-optC').value = '';
+                    document.getElementById('q-optD').value = '';
+                    document.getElementById('q-correct').value = '';
+                } else {
+                    const errorText = await response.text();
+                    showMessage(errorText || "Failed to add question.", true);
+                }
+            } catch (err) {
+                showMessage("Network error saving question.", true);
+            }
+        }
+
+        // Module Management Functions
+        async function loadModules(courseId) {
+            if (!courseId) {
+                document.getElementById('modules-container').innerHTML = '<p style="color: var(--text-secondary);">Select a course to view its modules.</p>';
+                document.getElementById('lesson-module').innerHTML = '<option value="" disabled selected>Select Course First</option>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/module/course/${courseId}`);
+                if (!response.ok) {
+                    let detail = '';
+                    try {
+                        const errBody = await response.clone().json();
+                        detail = errBody.message || JSON.stringify(errBody);
+                    } catch (e) {
+                        detail = await response.text();
+                    }
+                    throw new Error(`Server returned ${response.status}: ${detail}`);
+                }
+                const modules = await response.json();
+                if (!Array.isArray(modules)) {
+                    throw new Error('Expected an array of modules but got: ' + JSON.stringify(modules));
+                }
+                const container = document.getElementById('modules-container');
+                const lessonModuleSelect = document.getElementById('lesson-module');
+
+                // Update lesson module dropdown
+                lessonModuleSelect.innerHTML = '<option value="" disabled selected>Select Module</option>' + 
+                    modules.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
+
+                if (modules.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-secondary);">No modules found for this course.</p>';
+                    return;
+                }
+
+                container.innerHTML = modules.map(m => `
+                    <div style="padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-primary);">${escapeHtml(m.title)}</div>
+                            <div style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">${escapeHtml(m.description || 'No description')} | Order: ${m.orderIndex}</div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 13px;"
+                                    data-id="${m.id}"
+                                    data-title="${escapeHtml(m.title)}"
+                                    data-desc="${escapeHtml(m.description || '')}"
+                                    data-order="${m.orderIndex}"
+                                    onclick="editModule(this)">Edit</button>
+                            <button class="btn btn-danger btn-sm" style="padding: 6px 12px; font-size: 13px;"
+                                    onclick="deleteModule(${m.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Error loading modules:', err);
+                document.getElementById('modules-container').innerHTML = `<p style="color: var(--text-secondary);">Error loading modules.<br><small style="opacity:0.7;">${(err.message || err).toString().replace(/</g,'&lt;')}</small></p>`;
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        async function submitModule(event) {
+            event.preventDefault();
+            const form = event.target;
+            const editId = document.getElementById('edit-module-id').value;
+            const courseId = parseInt(document.getElementById('module-course').value);
+            const title = document.getElementById('module-title').value;
+            const description = document.getElementById('module-desc').value;
+            const orderIndex = parseInt(document.getElementById('module-order').value);
+
+            try {
+                let response;
+                if (editId) {
+                    response = await fetch(`/module/update/${editId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ title, description, orderIndex })
+                    });
+                } else {
+                    response = await fetch(`/module/save?courseId=${courseId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ title, description, orderIndex })
+                    });
+                }
+
+                if (response.ok) {
+                    const msg = editId ? "Module updated successfully!" : "Module saved successfully!";
+                    showMessage(msg);
+                    form.reset();
+                    document.getElementById('edit-module-id').value = '';
+                    document.getElementById('btn-save-module').textContent = 'Save Module';
+                    document.getElementById('btn-cancel-module-edit').style.display = 'none';
+                    loadModules(courseId);
+                } else {
+                    const errorText = await response.text();
+                    showMessage(errorText || "Failed to save module.", true);
+                }
+            } catch (err) {
+                showMessage("Network error saving module.", true);
+            }
+        }
+
+        function editModule(button) {
+            const id = parseInt(button.getAttribute('data-id'));
+            const title = button.getAttribute('data-title');
+            const desc = button.getAttribute('data-desc');
+            const orderIndex = parseInt(button.getAttribute('data-order'));
+            
+            document.getElementById('edit-module-id').value = id;
+            document.getElementById('module-title').value = title;
+            document.getElementById('module-desc').value = desc || '';
+            document.getElementById('module-order').value = orderIndex;
+            document.getElementById('btn-save-module').textContent = 'Update Module';
+            document.getElementById('btn-cancel-module-edit').style.display = 'inline-flex';
+            window.scrollTo({ top: document.getElementById('form-module').offsetTop - 100, behavior: 'smooth' });
+        }
+
+        function cancelModuleEdit() {
+            document.getElementById('edit-module-id').value = '';
+            document.getElementById('form-module').reset();
+            document.getElementById('btn-save-module').textContent = 'Save Module';
+            document.getElementById('btn-cancel-module-edit').style.display = 'none';
+        }
+
+        async function deleteModule(id) {
+            if (!confirm("Are you sure you want to delete this module? All lessons in this module will also be deleted.")) {
+                return;
+            }
+            try {
+                const response = await fetch(`/module/delete/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    showMessage("Module deleted successfully!");
+                    const courseId = document.getElementById('module-course').value;
+                    loadModules(courseId);
+                } else {
+                    const errorText = await response.text();
+                    showMessage(errorText || "Failed to delete module.", true);
+                }
+            } catch (err) {
+                showMessage("Network error deleting module.", true);
+            }
+        }
+
+        // Lesson Management Functions
+        async function loadLessons(moduleId) {
+            if (!moduleId) {
+                document.getElementById('lessons-container').innerHTML = '<p style="color: var(--text-secondary);">Select a module to view its lessons.</p>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/lesson/module/${moduleId}`);
+                if (!response.ok) {
+                    let detail = '';
+                    try {
+                        const errBody = await response.clone().json();
+                        detail = errBody.message || JSON.stringify(errBody);
+                    } catch (e) {
+                        detail = await response.text();
+                    }
+                    throw new Error(`Server returned ${response.status}: ${detail}`);
+                }
+                const lessons = await response.json();
+                if (!Array.isArray(lessons)) {
+                    throw new Error('Expected an array of lessons but got: ' + JSON.stringify(lessons));
+                }
+                const container = document.getElementById('lessons-container');
+
+                if (lessons.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-secondary);">No lessons found for this module.</p>';
+                    return;
+                }
+
+                container.innerHTML = lessons.map(l => `
+                    <div style="padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-primary);">${escapeHtml(l.title)}</div>
+                            <div style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">${l.contentType} | ${l.durationMinutes} mins | Order: ${l.orderIndex}</div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 13px;"
+                                    data-id="${l.id}"
+                                    data-title="${escapeHtml(l.title)}"
+                                    data-type="${l.contentType}"
+                                    data-url="${escapeHtml(l.contentUrl || '')}"
+                                    data-text="${escapeHtml(l.textContent || '')}"
+                                    data-order="${l.orderIndex}"
+                                    data-duration="${l.durationMinutes}"
+                                    onclick="editLesson(this)">Edit</button>
+                            <button class="btn btn-danger btn-sm" style="padding: 6px 12px; font-size: 13px;"
+                                    onclick="deleteLesson(${l.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Error loading lessons:', err);
+                document.getElementById('lessons-container').innerHTML = `<p style="color: var(--text-secondary);">Error loading lessons.<br><small style="opacity:0.7;">${(err.message || err).toString().replace(/</g,'&lt;')}</small></p>`;
+            }
+        }
+
+        async function submitLesson(event) {
+            event.preventDefault();
+            const form = event.target;
+            const editId = document.getElementById('edit-lesson-id').value;
+            const moduleId = parseInt(document.getElementById('lesson-module').value);
+            const title = document.getElementById('lesson-title').value;
+            const contentType = document.getElementById('lesson-type').value;
+            const contentUrl = document.getElementById('lesson-url').value;
+            const textContent = document.getElementById('lesson-text').value;
+            const orderIndex = parseInt(document.getElementById('lesson-order').value);
+            const durationMinutes = parseInt(document.getElementById('lesson-duration').value);
+
+            try {
+                let response;
+                if (editId) {
+                    response = await fetch(`/lesson/update/${editId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ title, contentType, contentUrl, textContent, orderIndex, durationMinutes })
+                    });
+                } else {
+                    response = await fetch(`/lesson/save?moduleId=${moduleId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ title, contentType, contentUrl, textContent, orderIndex, durationMinutes })
+                    });
+                }
+
+                if (response.ok) {
+                    const msg = editId ? "Lesson updated successfully!" : "Lesson saved successfully!";
+                    showMessage(msg);
+                    form.reset();
+                    document.getElementById('edit-lesson-id').value = '';
+                    document.getElementById('btn-save-lesson').textContent = 'Save Lesson';
+                    document.getElementById('btn-cancel-lesson-edit').style.display = 'none';
+                    loadLessons(moduleId);
+                } else {
+                    const errorText = await response.text();
+                    showMessage(errorText || "Failed to save lesson.", true);
+                }
+            } catch (err) {
+                showMessage("Network error saving lesson.", true);
+            }
+        }
+
+        function editLesson(button) {
+            const id = parseInt(button.getAttribute('data-id'));
+            const title = button.getAttribute('data-title');
+            const contentType = button.getAttribute('data-type');
+            const contentUrl = button.getAttribute('data-url');
+            const textContent = button.getAttribute('data-text');
+            const orderIndex = parseInt(button.getAttribute('data-order'));
+            const durationMinutes = parseInt(button.getAttribute('data-duration'));
+            
+            document.getElementById('edit-lesson-id').value = id;
+            document.getElementById('lesson-title').value = title;
+            document.getElementById('lesson-type').value = contentType;
+            document.getElementById('lesson-url').value = contentUrl || '';
+            document.getElementById('lesson-text').value = textContent || '';
+            document.getElementById('lesson-order').value = orderIndex;
+            document.getElementById('lesson-duration').value = durationMinutes;
+            document.getElementById('btn-save-lesson').textContent = 'Update Lesson';
+            document.getElementById('btn-cancel-lesson-edit').style.display = 'inline-flex';
+            window.scrollTo({ top: document.getElementById('form-lesson').offsetTop - 100, behavior: 'smooth' });
+        }
+
+        function cancelLessonEdit() {
+            document.getElementById('edit-lesson-id').value = '';
+            document.getElementById('form-lesson').reset();
+            document.getElementById('btn-save-lesson').textContent = 'Save Lesson';
+            document.getElementById('btn-cancel-lesson-edit').style.display = 'none';
+        }
+
+        async function deleteLesson(id) {
+            if (!confirm("Are you sure you want to delete this lesson?")) {
+                return;
+            }
+            try {
+                const response = await fetch(`/lesson/delete/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    showMessage("Lesson deleted successfully!");
+                    const moduleId = document.getElementById('lesson-module').value;
+                    loadLessons(moduleId);
+                } else {
+                    const errorText = await response.text();
+                    showMessage(errorText || "Failed to delete lesson.", true);
+                }
+            } catch (err) {
+                showMessage("Network error deleting lesson.", true);
+            }
+        }
+
+    </script>
+</body>
+</html>

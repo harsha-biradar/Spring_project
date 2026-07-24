@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${mockTest.title} + ' - Take Mock'">Take Mock Test - CourseHub</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+</head>
+<body>
+    <header class="glass-header">
+        <div class="container nav-wrapper">
+            <a href="/" class="brand-logo">CourseHub</a>
+            <nav class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a sec:authorize="hasRole('STUDENT')" href="/student/dashboard" class="btn btn-secondary">Dashboard</a>
+                <a sec:authorize="hasAnyRole('TRAINER','ADMIN')" href="/trainer/dashboard" class="btn btn-secondary">Dashboard</a>
+                <a href="/logout" class="btn btn-danger btn-sm" style="padding: 6px 12px; font-size: 13px;">Logout</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Quiz Play Area -->
+        <div id="quiz-area" class="quiz-container">
+            <div class="quiz-header glass-panel">
+                <div>
+                    <h2 th:text="${mockTest.title}" style="font-size: 22px; font-weight: 700;">Mock Test Title</h2>
+                    <p style="font-size: 13px; color: var(--text-secondary);" th:text="${mockTest.course.title}">Course Name</p>
+                </div>
+                <div class="timer-box">
+                    <span style="font-size: 14px;">⏱</span>
+                    <span id="countdown-timer">00:00</span>
+                </div>
+            </div>
+
+            <div th:if="${mockTest.questions == null || mockTest.questions.isEmpty()}" class="glass-panel" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                There are no questions in this mock test.
+            </div>
+
+            <!-- Questions Flow -->
+            <form id="quiz-form" th:if="${mockTest.questions != null && !mockTest.questions.isEmpty()}" onsubmit="submitQuiz(event)">
+                <div th:each="q, iter : ${mockTest.questions}" class="question-card glass-panel" th:id="'q-card-' + ${q.id}">
+                    <div class="question-text" th:text="'Q' + ${iter.count} + '. ' + ${q.questionText}">
+                        Question Text Here
+                    </div>
+                    
+                    <div class="options-list">
+                        <div class="option-item" th:onclick="'selectOption(' + ${q.id} + ', \'A\')'" th:id="'opt-' + ${q.id} + '-A'">
+                            <span class="option-marker">A</span>
+                            <span th:text="${q.optionA}">Option A Text</span>
+                        </div>
+                        <div class="option-item" th:onclick="'selectOption(' + ${q.id} + ', \'B\')'" th:id="'opt-' + ${q.id} + '-B'">
+                            <span class="option-marker">B</span>
+                            <span th:text="${q.optionB}">Option B Text</span>
+                        </div>
+                        <div class="option-item" th:onclick="'selectOption(' + ${q.id} + ', \'C\')'" th:id="'opt-' + ${q.id} + '-C'">
+                            <span class="option-marker">C</span>
+                            <span th:text="${q.optionC}">Option C Text</span>
+                        </div>
+                        <div class="option-item" th:onclick="'selectOption(' + ${q.id} + ', \'D\')'" th:id="'opt-' + ${q.id} + '-D'">
+                            <span class="option-marker">D</span>
+                            <span th:text="${q.optionD}">Option D Text</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quiz-footer">
+                    <a th:href="@{/courses/{id}(id=${mockTest.course.id})}" class="btn btn-secondary">Cancel Test</a>
+                    <button type="submit" class="btn btn-success" style="padding: 12px 30px;">Submit Test</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Result Screen (Hidden initially) -->
+        <div id="result-area" class="result-card glass-panel" style="display: none;">
+            <h2 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">Mock Test Completed</h2>
+            <p style="color: var(--text-secondary); font-size: 14px;">Here are your graded scorecard results</p>
+            
+            <div class="score-circle">
+                <div class="score-val" id="score-display">0/0</div>
+                <div class="score-lbl">Score</div>
+            </div>
+            
+            <h3 style="font-size: 22px; font-weight: 700; margin-bottom: 12px;" id="grade-display">Passed!</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 30px;" id="percentage-display">Percentage: 0%</p>
+            
+            <a th:href="@{/courses/{id}(id=${mockTest.course.id})}" class="btn btn-primary" style="padding: 12px 30px;">Back to Course</a>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 CourseHub Platform. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script th:inline="javascript">
+        /*[Thymeleaf Inline Javascript]*/
+        const studentId = /*[[${user != null ? user.id : 0}]]*/ 0;
+        const mockTestId = /*[[${mockTest.id}]]*/ 0;
+        const durationMins = /*[[${mockTest.duration}]]*/ 30;
+
+        let selectedAnswers = {}; // Map of questionId -> selectedOption (A, B, C, D)
+        let timerInterval;
+
+        // Initialize Timer
+        let timeLeft = durationMins * 60;
+        const timerElement = document.getElementById('countdown-timer');
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    alert("Time is up! Auto-submitting your test.");
+                    autoSubmitQuiz();
+                } else {
+                    timeLeft--;
+                    const minutes = Math.floor(timeLeft / 60);
+                    const seconds = timeLeft % 60;
+                    timerElement.textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
+        // Option Selection Handler
+        function selectOption(questionId, option) {
+            // Remove 'selected' class from all options of this question
+            const options = ['A', 'B', 'C', 'D'];
+            options.forEach(opt => {
+                const optEl = document.getElementById(`opt-${questionId}-${opt}`);
+                if (optEl) optEl.classList.remove('selected');
+            });
+
+            // Add 'selected' class to clicked option
+            const selectedEl = document.getElementById(`opt-${questionId}-${option}`);
+            if (selectedEl) selectedEl.classList.add('selected');
+
+            // Record the answer
+            selectedAnswers[questionId] = option;
+        }
+
+        // Regular Submit
+        async function submitQuiz(event) {
+            if (event) event.preventDefault();
+            if (!confirm("Are you sure you want to submit your mock test?")) return;
+            await sendAnswers();
+        }
+
+        // Auto Submit (Time expired)
+        async function autoSubmitQuiz() {
+            await sendAnswers();
+        }
+
+        async function sendAnswers() {
+            clearInterval(timerInterval);
+
+            try {
+                // POST Request to submit mock attempt
+                const response = await fetch(`/mock-attempt/submit?studentId=${studentId}&mockTestId=${mockTestId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(selectedAnswers)
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.status === 201) {
+                    const attempt = result.data;
+                    showResult(attempt);
+                } else {
+                    alert("Submission failed: " + (result.message || "Unknown error"));
+                }
+            } catch (err) {
+                alert("Network error submitting quiz.");
+            }
+        }
+
+        function showResult(attempt) {
+            document.getElementById('quiz-area').style.display = 'none';
+            document.getElementById('result-area').style.display = 'block';
+
+            document.getElementById('score-display').textContent = `${attempt.score}/${attempt.totalQuestions}`;
+            
+            const pct = attempt.totalQuestions > 0 ? Math.round((attempt.score / attempt.totalQuestions) * 100) : 0;
+            document.getElementById('percentage-display').textContent = `Percentage: ${pct}%`;
+
+            const gradeEl = document.getElementById('grade-display');
+            if (pct >= 50) {
+                gradeEl.textContent = "Great Job! You Passed!";
+                gradeEl.style.color = "#34d399";
+            } else {
+                gradeEl.textContent = "Keep Practicing! You Failed.";
+                gradeEl.style.color = "#f87171";
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Start the timer when page loads
+        if (document.getElementById('quiz-form')) {
+            startTimer();
+        }
+    </script>
+</body>
+</html>
