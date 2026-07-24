@@ -51,7 +51,7 @@ pipeline {
                     sh "docker rm ${APP_NAME} || true"
 
                     echo 'Starting new container...'
-                    sh "docker run -d --name ${APP_NAME} -p 8080:8080 ${IMAGE_NAME}:latest"
+                    sh "docker run -d --name ${APP_NAME} -p 8082:8082 ${IMAGE_NAME}:latest"
                 }
             }
         }
