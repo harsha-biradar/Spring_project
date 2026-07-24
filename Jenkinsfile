@@ -2,26 +2,30 @@ pipeline {
     agent any
 
     environment {
-        // Change 'your-dockerhub-username' to your actual Docker Hub username
-        DOCKER_HUB_USER = 'harshaa2475'
-        APP_NAME        = 'spring-boot-app'
-        IMAGE_TAG       = "${env.BUILD_NUMBER}"
-        IMAGE_NAME      = "${DOCKER_HUB_USER}/${APP_NAME}"
+        DOCKER_IMAGE = 'harshaa2475/spring-project'
+        DOCKER_HUB_CREDS = 'docker-hub-credentials'
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                echo 'Pulling latest code from GitHub...'
-                checkout scm
+                git branch: 'main', url: 'https://github.com/harsha-biradar/Spring_project.git'
+            }
+        }
+
+        stage('Build Application') {
+            steps {
+                // Build the JAR file using Maven
+                sh './mvnw clean package -DskipTests'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    echo "Building Docker image: ${IMAGE_NAME}:${IMAGE_TAG}"
-                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest ."
+                    // Build the docker image tagged with the build number and latest
+                    dockerImage = docker.build("${DOCKER_IMAGE}:${BUILD_NUMBER}")
+                    dockerImage.tag('latest')
                 }
             }
         }
@@ -29,29 +33,24 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    echo 'Logging into Docker Hub and pushing images...'
-                    withCredentials([usernamePassword(
-                        credentialsId: 'docker-hub-credentials', 
-                        usernameVariable: 'DOCKER_USER', 
-                        passwordVariable: 'DOCKER_PASS'
-                    )]) {
-                        sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
-                        sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
-                        sh "docker push ${IMAGE_NAME}:latest"
+                    // Log in to Docker Hub using the Jenkins credentials ID and push
+                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_HUB_CREDS}") {
+                        dockerImage.push("${BUILD_NUMBER}")
+                        dockerImage.push('latest')
                     }
                 }
             }
         }
 
-        stage('Deploy / Run Container') {
+        stage('Deploy Container') {
             steps {
                 script {
-                    echo 'Cleaning up old container if running...'
-                    sh "docker stop ${APP_NAME} || true"
-                    sh "docker rm ${APP_NAME} || true"
-
-                    echo 'Starting new container...'
-                    sh "docker run -d --name ${APP_NAME} -p 8082:8082 ${IMAGE_NAME}:latest"
+                    // Stop and remove old container if running, then run the newly pushed image
+                    sh '''
+                        docker stop spring-app || true
+                        docker rm spring-app || true
+                        docker run -d --name spring-app -p 8082:8080 harshaa2475/spring-project:latest
+                    '''
                 }
             }
         }
@@ -59,14 +58,8 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline finished. Cleaning up local unused Docker images...'
-            sh "docker image prune -f"
-        }
-        success {
-            echo 'Successfully built, pushed, and deployed the application!'
-        }
-        failure {
-            echo 'Pipeline failed. Please check the logs above.'
+            // Clean up workspace to save disk space on EC2
+            cleanWs()
         }
     }
 }
