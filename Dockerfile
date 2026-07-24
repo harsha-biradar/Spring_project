@@ -1,27 +1,14 @@
-# ==========================================
-# Stage 1: Build the Application
-# ==========================================
-FROM maven:3.9-eclipse-temurin-17 AS builder
+# Change this:
+# FROM maven:3.9-eclipse-temurin-17 AS build
+
+# To this:
+FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
-
-# Copy dependency definition and source code
-COPY pom.xml .
-COPY src ./src
-
-# Package the application (skipping tests for faster CI builds)
+COPY . .
 RUN mvn clean package -DskipTests
 
-# ==========================================
-# Stage 2: Minimal Runtime Environment
-# ==========================================
-FROM eclipse-temurin:17-jre-alpine
+# Runtime stage
+FROM eclipse-temurin:21-jre
 WORKDIR /app
-
-# Copy the compiled JAR from Stage 1
-COPY --from=builder /app/target/*.jar app.jar
-
-# Expose default Spring Boot HTTP port
-EXPOSE 8082
-
-# Run the Spring Boot JAR
+COPY --from=build /app/target/*.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]
